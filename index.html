@@ -902,6 +902,7 @@ html, body {
 @media (max-width: 900px) {
   .left-sidebar { display: none; }
   .mobile-topbar { display: flex; }
+  .today-header-actions { display: none; }
   .mobile-tabbar { display: grid; }
   body::after {
     content: "";
@@ -1500,12 +1501,15 @@ function startFreshForJennifer() {
 function loadSampleDemoData() {
   const def = defaultState();
   def.theme = state.theme || "terracotta";
+  def.explicitDemo = true;
   def.updatedAt = new Date().toISOString();
   state = def;
   ui.selectedChildId = "c1";
   ui.editingVisitId = "v103";
   ui.page = null;
-  saveState("Loaded sample demo caseload (6 demo families).");
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  ui.bannerMsg = "Loaded sample demo caseload on this device (Jennifer's Cloud Vault is untouched).";
+  render();
 }
 
 function renderDemoBanner() {
@@ -1536,13 +1540,13 @@ function loadState() {
         if (parsed.caseloadMode === "jennifer") {
           return parsed;
         }
-        if (parsed.children[0] && parsed.children[0].name === "Liam Smith") {
+        if (parsed.caseloadMode === "demo" && parsed.explicitDemo === true) {
           return parsed;
         }
       }
     }
   } catch (e) {}
-  return defaultState();
+  return jenniferFreshState("terracotta");
 }
 
 function saveState(msg) {
@@ -1577,7 +1581,11 @@ async function syncToServer(forcePush) {
     });
   } catch (e) {}
 
-  // 2. Cross-Device Cloud Sync (AES-256-GCM encrypted before leaving browser)
+  // 2. Cross-Device Cloud Sync (AES-256-GCM encrypted before leaving browser — never push demo data!)
+  if (isDemoCaseload() && !forcePush) {
+    updateSyncPillUI("Demo Mode (Local)");
+    return false;
+  }
   try {
     const cfg = await unlockCloudVaultConfig(ui.syncPasscode || "mcmakin");
     if (cfg && cfg.gistId && cfg.token) {
@@ -1630,6 +1638,12 @@ async function pullFromCloudVault(showBanner) {
           if (env && env.ciphertext) {
             const remoteState = await decryptStateClientSide(env, ui.syncPasscode || "mcmakin");
             if (remoteState && Array.isArray(remoteState.children) && Array.isArray(remoteState.visits)) {
+              const remoteHasDemo = remoteState.caseloadMode === "demo" || remoteState.children.some(c => c.name === "Liam Smith" || c.name === "Maya Thompson");
+              if (remoteHasDemo && !isDemoCaseload()) {
+                // Never let old demo data in the cloud overwrite Jennifer's clean caseload; push clean state instead
+                await syncToServer(true);
+                return false;
+              }
               const localTime = Date.parse(state.updatedAt || "2000-01-01T00:00:00Z") || 0;
               const remoteTime = Date.parse(remoteState.updatedAt || env.updatedAt || "2000-01-01T00:00:00Z") || 0;
               if (showBanner || remoteTime > localTime) {
@@ -1652,6 +1666,278 @@ async function pullFromCloudVault(showBanner) {
   } catch (e) {}
   updateSyncPillUI("Saved on Device");
   return false;
+}
+
+
+/* CALENDAR INTEGRATION (iPhone / Mac Apple Calendar .ics, Google Calendar, Outlook & .ics Import) */
+function parseVisitStartDate(dateStr, timeStr) {
+  const base = dateStr || TODAY_STR;
+  const parts = base.split("-").map(Number);
+  const year = parts[0] || 2026;
+  const month = (parts[1] || 10) - 1;
+  const day = parts[2] || 27;
+  let hours = 10;
+  let mins = 0;
+  if (timeStr) {
+    const m = String(timeStr).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (m) {
+      hours = parseInt(m[1], 10);
+      mins = parseInt(m[2], 10);
+      const ampm = (m[3] || "").toUpperCase();
+      if (ampm === "PM" && hours < 12) hours += 12;
+      if (ampm === "AM" && hours === 12) hours = 0;
+    }
+  }
+  return new Date(year, month, day, hours, mins, 0);
+}
+
+function toIcsUtcStamp(dt) {
+  const pad = n => String(n).padStart(2, "0");
+  return (
+    dt.getFullYear() +
+    pad(dt.getMonth() + 1) +
+    pad(dt.getDate()) +
+    "T" +
+    pad(dt.getHours()) +
+    pad(dt.getMinutes()) +
+    "00"
+  );
+}
+
+function addVisitToAppleCalendar(visitId) {
+  let v = state.visits.find(x => x.id === visitId);
+  if (!v) {
+    const childEl = document.getElementById("f-child");
+    const typeEl = document.getElementById("f-type");
+    const minEl = document.getElementById("f-min");
+    const dateEl = document.getElementById("f-date");
+    const timeEl = document.getElementById("f-time");
+    const c = getChild(childEl ? childEl.value : ui.selectedChildId);
+    v = {
+      id: "v_cal_" + Date.now(),
+      childId: c.id,
+      date: dateEl ? dateEl.value : TODAY_STR,
+      time: timeEl ? timeEl.value : "10:00 AM",
+      serviceType: typeEl ? typeEl.value : "Home Visit",
+      withWho: c.caregiverShort || c.caregiver,
+      minutes: minEl ? Number(minEl.value) || 60 : 60
+    };
+  }
+  const c = getChild(v.childId);
+  const startDt = parseVisitStartDate(v.date, v.time);
+  const endDt = new Date(startDt.getTime() + (Number(v.minutes) || 60) * 60000);
+  const u = calcSilentUnits(v.serviceType, v.minutes);
+  const title = `EI ${v.serviceType}: ${c.name}`;
+  const loc = c.location || "Home Visit";
+  const desc = `EarlyNote Visit (${u} units · ${v.minutes} min) with ${v.withWho || c.caregiver}.`;
+
+  const icsLines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//EarlyNote//Family Visit Journal//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${v.id}@earlynote.app`,
+    `DTSTAMP:${toIcsUtcStamp(new Date())}`,
+    `DTSTART:${toIcsUtcStamp(startDt)}`,
+    `DTEND:${toIcsUtcStamp(endDt)}`,
+    `SUMMARY:${title.replace(/[,;]/g, " ")}`,
+    `LOCATION:${loc.replace(/[,;]/g, " ")}`,
+    `DESCRIPTION:${desc.replace(/\n/g, "\\n")}`,
+    "BEGIN:VALARM",
+    "TRIGGER:-PT30M",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Upcoming EarlyNote Family Visit in 30 minutes",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
+
+  const blob = new Blob([icsLines], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Visit-${c.firstName}-${v.date}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  ui.bannerMsg = `Opened ${c.name}'s visit for iPhone / Mac Calendar (.ics).`;
+  render();
+}
+
+function openGoogleCalendarForVisit(visitId) {
+  let v = state.visits.find(x => x.id === visitId);
+  if (!v) {
+    const childEl = document.getElementById("f-child");
+    const typeEl = document.getElementById("f-type");
+    const minEl = document.getElementById("f-min");
+    const dateEl = document.getElementById("f-date");
+    const timeEl = document.getElementById("f-time");
+    const c = getChild(childEl ? childEl.value : ui.selectedChildId);
+    v = {
+      id: "v_gcal_" + Date.now(),
+      childId: c.id,
+      date: dateEl ? dateEl.value : TODAY_STR,
+      time: timeEl ? timeEl.value : "10:00 AM",
+      serviceType: typeEl ? typeEl.value : "Home Visit",
+      withWho: c.caregiverShort || c.caregiver,
+      minutes: minEl ? Number(minEl.value) || 60 : 60
+    };
+  }
+  const c = getChild(v.childId);
+  const startDt = parseVisitStartDate(v.date, v.time);
+  const endDt = new Date(startDt.getTime() + (Number(v.minutes) || 60) * 60000);
+  const u = calcSilentUnits(v.serviceType, v.minutes);
+  const datesParam = `${toIcsUtcStamp(startDt)}/${toIcsUtcStamp(endDt)}`;
+  const textParam = encodeURIComponent(`EI ${v.serviceType}: ${c.name}`);
+  const locParam = encodeURIComponent(c.location || "Home");
+  const detailsParam = encodeURIComponent(`EarlyNote Visit (${u} units · ${v.minutes} min) with ${v.withWho || c.caregiver}`);
+  window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${textParam}&dates=${datesParam}&location=${locParam}&details=${detailsParam}`, "_blank");
+}
+
+function exportAllVisitsToCalendarIcs() {
+  if (state.visits.length === 0 && state.children.length === 0) {
+    ui.bannerMsg = "Add a child or visit first, then tap Add to iPhone / Mac Calendar.";
+    render();
+    return;
+  }
+  const events = [];
+  state.visits.forEach(v => {
+    const c = getChild(v.childId);
+    const startDt = parseVisitStartDate(v.date, v.time);
+    const endDt = new Date(startDt.getTime() + (Number(v.minutes) || 60) * 60000);
+    const u = calcSilentUnits(v.serviceType, v.minutes);
+    events.push([
+      "BEGIN:VEVENT",
+      `UID:${v.id}@earlynote.app`,
+      `DTSTAMP:${toIcsUtcStamp(new Date())}`,
+      `DTSTART:${toIcsUtcStamp(startDt)}`,
+      `DTEND:${toIcsUtcStamp(endDt)}`,
+      `SUMMARY:${(`EI ${v.serviceType}: ${c.name}`).replace(/[,;]/g, " ")}`,
+      `LOCATION:${(c.location || "Home").replace(/[,;]/g, " ")}`,
+      `DESCRIPTION:EarlyNote Visit (${u} units · ${v.minutes} min) with ${v.withWho || c.caregiver}`,
+      "BEGIN:VALARM",
+      "TRIGGER:-PT30M",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Upcoming EarlyNote Visit",
+      "END:VALARM",
+      "END:VEVENT"
+    ].join("\r\n"));
+  });
+
+  const icsLines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//EarlyNote//Family Visit Journal//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    ...events,
+    "END:VCALENDAR"
+  ].join("\r\n");
+
+  const blob = new Blob([icsLines], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `EarlyNote-Schedule-${TODAY_STR}.ics`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  ui.bannerMsg = `Exported ${state.visits.length} visits to iPhone / Mac / Outlook Calendar (.ics).`;
+  render();
+}
+
+function importCalendarIcs(fileInput) {
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const text = String(evt.target.result || "");
+      const blocks = text.split("BEGIN:VEVENT").slice(1);
+      let importedCount = 0;
+      blocks.forEach((b, idx) => {
+        const sumMatch = b.match(/SUMMARY(?:;[^:]*)?:([^\r\n]+)/i);
+        const startMatch = b.match(/DTSTART(?:;[^:]*)?:(\d{8})(?:T(\d{4,6}))?/i);
+        const endMatch = b.match(/DTEND(?:;[^:]*)?:(\d{8})(?:T(\d{4,6}))?/i);
+        const locMatch = b.match(/LOCATION(?:;[^:]*)?:([^\r\n]+)/i);
+        if (!sumMatch || !startMatch) return;
+
+        let rawTitle = sumMatch[1].trim().replace(/^EI\s*(Home Visit|Daycare Visit|Phone Check-In)?\s*[:\-]?\s*/i, "");
+        const dRaw = startMatch[1];
+        const dateFormatted = `${dRaw.slice(0,4)}-${dRaw.slice(4,6)}-${dRaw.slice(6,8)}`;
+        let timeFormatted = "10:00 AM";
+        let durationMins = 60;
+
+        if (startMatch[2]) {
+          const sh = parseInt(startMatch[2].slice(0,2), 10);
+          const sm = parseInt(startMatch[2].slice(2,4), 10);
+          const ampm = sh >= 12 ? "PM" : "AM";
+          const h12 = sh % 12 === 0 ? 12 : sh % 12;
+          timeFormatted = `${h12}:${String(sm).padStart(2, "0")} ${ampm}`;
+          if (endMatch && endMatch[2]) {
+            const eh = parseInt(endMatch[2].slice(0,2), 10);
+            const em = parseInt(endMatch[2].slice(2,4), 10);
+            const diff = (eh * 60 + em) - (sh * 60 + sm);
+            if (diff >= 5 && diff <= 240) durationMins = diff;
+          }
+        }
+
+        const childName = rawTitle || `Calendar Family ${idx + 1}`;
+        let childObj = state.children.find(c => c.name.toLowerCase() === childName.toLowerCase() || childName.toLowerCase().includes(c.firstName.toLowerCase()));
+        if (!childObj) {
+          const newId = "c_cal_" + Date.now() + "_" + idx;
+          childObj = {
+            id: newId,
+            name: childName,
+            firstName: childName.split(" ")[0],
+            age: "18 months",
+            dob: "Apr 10, 2025",
+            caregiver: "Family Caregiver",
+            caregiverShort: "Family",
+            location: locMatch ? locMatch[1].trim() : "Home",
+            nextMilestone: "6-Month Review upcoming",
+            milestones: [{ label: "6-Month Plan Review", date: "Upcoming", due: "Scheduled", highlight: true }],
+            goals: ["Support everyday family communication and play routines."]
+          };
+          state.children.push(childObj);
+        }
+
+        const vType = /daycare/i.test(sumMatch[1]) ? "Daycare Visit" : (/phone|call/i.test(sumMatch[1]) ? "Phone Check-In" : "Home Visit");
+        state.visits.unshift({
+          id: "v_ics_" + Date.now() + "_" + idx,
+          childId: childObj.id,
+          date: dateFormatted,
+          time: timeFormatted,
+          timeRange: timeFormatted,
+          serviceType: vType,
+          withWho: childObj.caregiverShort || "Family",
+          minutes: durationMins,
+          status: "Scheduled",
+          noteDone: false,
+          familyShared: "",
+          practiced: "",
+          childResponse: "",
+          nextPlan: ""
+        });
+        importedCount++;
+      });
+
+      if (importedCount > 0) {
+        saveState(`Imported ${importedCount} visit${importedCount === 1 ? "" : "s"} from your calendar (.ics).`);
+      } else {
+        ui.bannerMsg = "No calendar events found in that .ics file.";
+        render();
+      }
+    } catch (e) {
+      ui.bannerMsg = "Could not parse that calendar (.ics) file.";
+      render();
+    }
+  };
+  reader.readAsText(file);
 }
 
 function exportCaseloadJson() {
@@ -1843,6 +2129,10 @@ function renderTodayView(sum) {
       <div class="jennifer-welcome-actions">
         <button class="btn btn-primary" onclick="openChildEditor(null)">+ Add First Child</button>
         <button class="btn" onclick="openVisitNote(null)">+ Schedule Today's Visit</button>
+        <label class="btn" style="cursor: pointer;">
+          Import from Calendar (.ics)
+          <input type="file" accept=".ics,text/calendar" style="display: none;" onchange="importCalendarIcs(this)" />
+        </label>
       </div>
     </div>
   ` : "";
@@ -1972,6 +2262,14 @@ function renderVisitEditorPage() {
           <label class="form-label">Duration (Minutes)</label>
           <input id="f-min" class="input" type="number" min="5" max="240" step="5" value="${v.minutes}" oninput="updateNoteHeaderPreview()" />
         </div>
+        <div class="form-group">
+          <label class="form-label">Visit Date</label>
+          <input id="f-date" class="input" type="date" value="${esc(v.date || TODAY_STR)}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Start Time</label>
+          <input id="f-time" class="input" type="text" placeholder="e.g. 10:00 AM" value="${esc(v.time || '10:00 AM')}" />
+        </div>
       </div>
 
       <div class="note-field-group">
@@ -1995,9 +2293,11 @@ function renderVisitEditorPage() {
       </div>
 
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
           <button class="btn btn-primary" onclick="saveVisitNote('${existing ? existing.id : ""}')">Save Note</button>
           <button class="btn" onclick="copyVisitNote('${existing ? existing.id : v.id}')">Copy Note</button>
+          <button class="btn" onclick="addVisitToAppleCalendar('${existing ? existing.id : ""}')">Add to iPhone / Mac Calendar</button>
+          <button class="btn" onclick="openGoogleCalendarForVisit('${existing ? existing.id : ""}')">Google Calendar</button>
         </div>
         ${existing ? `<button class="btn btn-subtle" onclick="deleteVisitNote('${existing.id}')">Delete</button>` : ""}
       </div>
@@ -2028,6 +2328,8 @@ function saveVisitNote(existingId) {
   const c = getChild(childId);
   const serviceType = document.getElementById("f-type").value;
   const minutes = Math.max(5, Math.min(240, Number(document.getElementById("f-min").value) || 60));
+  const visitDate = (document.getElementById("f-date") && document.getElementById("f-date").value) || TODAY_STR;
+  const visitTime = (document.getElementById("f-time") && document.getElementById("f-time").value.trim()) || "10:00 AM";
   const familyShared = document.getElementById("f-shared").value.trim() || `${c.caregiverShort} shared updates from this week's routines.`;
   const practiced = document.getElementById("f-practiced").value.trim() || "Practiced play and communication strategies together during daily routines.";
   const childResponse = document.getElementById("f-response").value.trim() || `${c.firstName} engaged well and practiced the routine with ${c.caregiverShort}.`;
@@ -2039,6 +2341,9 @@ function saveVisitNote(existingId) {
       state.visits[idx] = {
         ...state.visits[idx],
         childId,
+        date: visitDate,
+        time: visitTime,
+        timeRange: visitTime,
         serviceType,
         minutes,
         status: "Completed",
@@ -2053,9 +2358,9 @@ function saveVisitNote(existingId) {
     state.visits.unshift({
       id: "v" + Date.now(),
       childId,
-      date: TODAY_STR,
-      time: "1:00 PM",
-      timeRange: "1:00 PM – 2:00 PM",
+      date: visitDate,
+      time: visitTime,
+      timeRange: visitTime,
       serviceType,
       withWho: c.caregiverShort || c.caregiver,
       minutes,
@@ -2089,6 +2394,10 @@ function renderCaseloadView() {
       <div class="jennifer-welcome-actions">
         <button class="btn btn-primary" onclick="openChildEditor(null)">+ Add First Child</button>
         <button class="btn" onclick="openVisitNote(null)">+ Schedule Today's Visit</button>
+        <label class="btn" style="cursor: pointer;">
+          Import from Calendar (.ics)
+          <input type="file" accept=".ics,text/calendar" style="display: none;" onchange="importCalendarIcs(this)" />
+        </label>
       </div>
     </div>
   ` : "";
@@ -2386,29 +2695,54 @@ function renderAllNotesView() {
 function renderUnitsCalendarView(sum) {
   const todayPct = Math.min(100, Math.round((sum.todayUnits / sum.todayGoal) * 100));
   const weekPct = Math.min(100, Math.round((sum.weekUnits / sum.weekGoal) * 100));
-  const days = [
-    { day: "Mon, Oct 26 (Today)", visits: "6 visits · Maya, Noah, Liam, Ava, Caleb, Chloe", units: "16 of 20 units completed (21 scheduled)" },
-    { day: "Fri, Oct 23", visits: "4 visits · Liam, Maya, Ava, Chloe", units: "14 units completed" },
-    { day: "Thu, Oct 22", visits: "4 visits · Noah, Caleb, Maya, Liam", units: "13 units completed" },
-    { day: "Wed, Oct 21", visits: "3 visits · Ava, Chloe, Caleb", units: "12 units completed" },
-    { day: "Tue, Oct 20", visits: "4 visits · Liam, Noah, Maya, Ava", units: "13 units completed" }
-  ];
+
+  // Build daily summary dynamically from actual visits (zero hardcoded demo kids in Jennifer mode!)
+  let days = [];
+  if (isDemoCaseload()) {
+    days = [
+      { day: "Mon, Oct 26 (Today)", visits: "6 visits · Maya, Noah, Liam, Ava, Caleb, Chloe", units: "16 of 20 units completed (21 scheduled)" },
+      { day: "Fri, Oct 23", visits: "4 visits · Liam, Maya, Ava, Chloe", units: "14 units completed" },
+      { day: "Thu, Oct 22", visits: "4 visits · Noah, Caleb, Maya, Liam", units: "13 units completed" },
+      { day: "Wed, Oct 21", visits: "3 visits · Ava, Chloe, Caleb", units: "12 units completed" },
+      { day: "Tue, Oct 20", visits: "4 visits · Liam, Noah, Maya, Ava", units: "13 units completed" }
+    ];
+  } else {
+    const grouped = {};
+    state.visits.forEach(v => {
+      const dKey = v.date || TODAY_STR;
+      if (!grouped[dKey]) grouped[dKey] = [];
+      grouped[dKey].push(v);
+    });
+    const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+    days = sortedDates.map(dKey => {
+      const vList = grouped[dKey];
+      const names = vList.map(v => getChild(v.childId).firstName);
+      const completedU = vList.reduce((acc, v) => acc + (v.status === "Completed" ? calcSilentUnits(v.serviceType, v.minutes) : 0), 0);
+      const totalU = vList.reduce((acc, v) => acc + calcSilentUnits(v.serviceType, v.minutes), 0);
+      const label = dKey === TODAY_STR ? `${dKey} (Today)` : dKey;
+      return {
+        day: label,
+        visits: `${vList.length} visit${vList.length === 1 ? "" : "s"} · ${names.join(", ")}`,
+        units: completedU === totalU ? `${completedU} units completed` : `${completedU} of ${totalU} units completed`
+      };
+    });
+  }
 
   return `
     <div class="page-header">
       <div>
         <div class="page-title">Units &amp; Calendar</div>
-        <div class="page-subtitle">Automatic daily &amp; weekly unit totals and upcoming family review dates</div>
+        <div class="page-subtitle">Daily &amp; weekly unit totals, Apple / Google / Outlook Calendar sync, and review dates</div>
       </div>
       <div class="header-actions">
-        <button class="btn btn-primary" onclick="openVisitNote(null, 'c1')">+ New Visit</button>
+        <button class="btn btn-primary" onclick="openVisitNote(null)">+ New Visit</button>
       </div>
     </div>
 
     <div class="unit-progress-card">
       <div class="unit-bar-group">
         <div class="unit-bar-header">
-          <span class="unit-bar-label">Today (Mon, Oct 26)</span>
+          <span class="unit-bar-label">Today</span>
           <span class="unit-bar-value">${sum.todayUnits} of ${sum.todayGoal} units</span>
         </div>
         <div class="progress-track">
@@ -2427,11 +2761,36 @@ function renderUnitsCalendarView(sum) {
     </div>
 
     <div class="card">
+      <div class="card-title" style="margin-bottom: 6px;">iPhone, Mac, Google &amp; Outlook Calendar Sync</div>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 14px;">
+        <strong>Add to Jennifer's Calendar:</strong> Tap below on iPhone or Mac to open Apple Calendar and add all scheduled visits with a 30-minute reminder alert.<br/>
+        <strong>Import from Jennifer's Calendar:</strong> Already have visits on your calendar? Import any <code>.ics</code> calendar file to automatically create your visit schedule and calculate units.
+      </p>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <button class="btn btn-primary" onclick="exportAllVisitsToCalendarIcs()">
+          Add Visits to iPhone / Mac Calendar (.ics)
+        </button>
+        <label class="btn" style="cursor: pointer;">
+          Import Visits from Calendar (.ics)
+          <input type="file" accept=".ics,text/calendar" style="display: none;" onchange="importCalendarIcs(this)" />
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-header">
         <div class="card-title">This Week's Daily Summary</div>
       </div>
       <div class="milestone-list">
-        ${days.map(d => `
+        ${days.length === 0 ? `
+          <div class="milestone-row">
+            <div>
+              <div style="font-weight: 650; color: var(--text-main);">No visits logged yet this week</div>
+              <div style="font-size: 13px; color: var(--text-secondary);">Tap "+ New Visit" or "Import Visits from Calendar (.ics)" above to start Jennifer's week.</div>
+            </div>
+            <span class="badge badge-done">0 of ${sum.todayGoal} units</span>
+          </div>
+        ` : days.map(d => `
           <div class="milestone-row">
             <div>
               <div style="font-weight: 650; color: var(--text-main);">${esc(d.day)}</div>
@@ -2448,7 +2807,15 @@ function renderUnitsCalendarView(sum) {
         <div class="card-title">Upcoming Family Reviews &amp; Milestones</div>
       </div>
       <div class="milestone-list">
-        ${state.children.map(c => `
+        ${state.children.length === 0 ? `
+          <div class="milestone-row">
+            <div>
+              <div style="font-weight: 650; color: var(--text-main);">No children on caseload yet</div>
+              <div style="font-size: 13px; color: var(--text-secondary);">Add a child in Caseload to track 6-Month and Annual Review dates.</div>
+            </div>
+            <button class="btn btn-sm btn-primary" onclick="openChildEditor(null)">+ Add Child</button>
+          </div>
+        ` : state.children.map(c => `
           <div class="milestone-row" style="cursor: pointer;" onclick="openChildProfile('${c.id}')">
             <div>
               <div style="font-weight: 650; color: var(--text-main);">${esc(c.name)}</div>
