@@ -112,3 +112,30 @@
    - Apple Developer Program account (`$99/yr`) for iOS App Store, TestFlight beta, and notarized Mac `.dmg` code signing.
    - In-app **"Delete Account & Cryptographically Shred Vault"** button (`Apple Guideline 5.1.1(v)`).
    - Privacy Nutrition Labels & Healthcare Guideline `5.1.3` attestation documenting zero-PHI cloud storage and Safe Harbor de-identification.
+
+---
+
+## 6. Chief of Staff (Cal) Strategic Review: v1.0 Cuts, Critical Safeguards & GTM Additions
+
+### A. What to CUT or DEFER from Phase 1 (`v1.0`) to Ship Fast & Avoid Bloat
+1. **Defer Windows (`.exe`) and Android (`.apk`) until `v1.2`:**
+   - Maintaining 4 native targets (`Tauri Mac`, `Tauri Windows`, `Capacitor iOS`, `Capacitor Android`) on Day 1 triples QA and build complexity. Ship **iOS (`.ipa`) + Responsive Web PWA / Mac (`.dmg`)** first—that covers Jennifer and ~90% of field EIs immediately.
+2. **Move the `BRIDGES` & `Therap` Manifest V3 Browser Extension from `v1.0` to `v1.1`:**
+   - Submitting a Chrome/Safari extension alongside an iOS App Store healthcare app doubles store-review delays and requires cross-process native messaging for decrypted notes. For `v1.0`, ship **1-Tap Field Copy Pills** (`[Copy Narrative]`, `[Copy 24h Time]`, `[Copy Units]`) optimized for side-by-side split screen with `BRIDGES`/`Therap`. Build the auto-fill extension in `v1.1` once 10+ EIs are paying.
+3. **Move Parent Finger E-Signature to `v1.1` (and Require Kiosk Lock):**
+   - Handing an unlocked personal iPhone to a parent at the end of a visit risks accidental exposure of other children's names on the screen. Defer finger signature to `v1.1`, and when added, lock it inside a **PIN/FaceID-guarded "Parent Sign Mode"** that hides the bottom dock and caseload roster. For `v1.0`, let the EI tap `Share Family Carryover Summary via SMS/Print` from their own phone.
+4. **Replace Server-Triggered Deadline Push Alerts (`deadline_alerts` table + APNs cron) with On-Device Local Notifications for `v1.0`:**
+   - Use native iOS/macOS **On-Device Local Notifications (`UNUserNotificationCenter`)** scheduled locally whenever a child's dates are saved or decrypted. Zero server cron jobs, zero APNs backend maintenance, works 100% offline, and leaks zero metadata to the server.
+
+### B. Critical Features, Legal/HIPAA Safeguards & GTM Steps to ADD to `v1.0`
+1. **ADD (Mandatory Zero-Knowledge Safeguard): Emergency Vault Recovery Kit (`12-Word Recovery Phrase / Printable Recovery Key`):**
+   - Because `v1.0` uses true zero-knowledge encryption (`PBKDF2` / `AES-256-GCM`) where the server never sees the key, a forgotten passphrase or lost phone without iCloud Keychain would permanently lock an EI out of their caseload and billable notes. Add a mandatory 1-time **"Download Emergency Recovery Kit"** step during setup.
+2. **ADD (High-Frequency Field Reality): 1-Tap `Cancelled / No-Show Visit` Quick Log (`0 Units`):**
+   - Kids get sick and visits cancel daily. EIs still must log attempted contact/cancellations in `BRIDGES`/`Therap` (`0 Units`) to prove monthly contact compliance. Add a **1-Tap `Cancelled / No-Show` button** on every visit card that generates a compliant 3-line cancellation contact note (`0 Units`) in 3 seconds.
+3. **ADD (PHI Scrubber Hardening): Per-Child Local Scrub Dictionary (Nicknames, Siblings & Daycare Names):**
+   - Spoken car notes frequently include nicknames, siblings, or daycare names (*"Met with Liam and his grandma Brenda at Little Lambs Daycare"*) that generic regex scrubbers miss. Each child profile should store a local-only **Known Names & Places Scrub List** (auto-populated from the child's intake fields + caregiver/daycare names) that deterministically swaps to `[CHILD_1]`, `[CAREGIVER_2]`, `[SITE_1]` before any token leaves the device.
+4. **ADD (Cost & Legal Discipline): `$0` Out-of-Pocket Pre-Validation Gate + Clear "Personal Drafting Tool" Terms:**
+   - **Stage the `$99` Apple Developer fee:** Run Jennifer's 2-week real-world field test on the **iOS Home-Screen PWA + Mac Desktop Web/Tauri build** at **$0 out-of-pocket** (`Supabase Free Tier` + `GitHub/Cloudflare Pages`). Pay the `$99/yr` Apple Developer fee only after Jennifer validates the workflow for 2 full weeks.
+   - **Terms of Service Boundary:** Explicitly state in the ToS that EarlyNote is a zero-knowledge personal drafting and unit-tracking companion—not an official medical record or replacement for `BRIDGES`/`Therap`—and require the EI's clinical attestation checkbox before any note can be copied out.
+5. **ADD (Organic Zero-Outreach Growth Engine): Built-In "Give 30 Days, Get 30 Days" Colleague Referral Link:**
+   - Since growth must be 100% organic with zero cold outreach, build a 1-tap **"Share EarlyNote with an EI Colleague (1 Month Free)"** referral card inside Settings so Jennifer and her first few EI coworkers naturally spread it across SC agencies.
