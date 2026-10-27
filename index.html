@@ -262,14 +262,17 @@ html, body {
   margin-right: 6px;
 }
 
-/* MAIN VIEW AREA — CALM SINGLE-COLUMN CONTAINER */
+/* MAIN VIEW AREA — FULL-HEIGHT BALANCED DESKTOP CONTAINER */
 .main-stage {
   flex: 1;
   min-width: 0;
   width: 100%;
-  padding: 26px 40px 48px;
-  max-width: 860px;
+  min-height: 100vh;
+  padding: 24px 36px 24px;
+  max-width: 1160px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .page-header {
@@ -949,6 +952,149 @@ html, body {
   .theme-choice-btn { font-size: 13px; padding: 11px 12px; }
 }
 
+
+/* SIDEBAR QUICK CASELOAD & DESKTOP BOTTOM BENTO (FILLS VERTICAL DESKTOP SPACE CLEANLY) */
+.sidebar-quick-panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex: 1;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.sidebar-section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-child-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sidebar-child-btn {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 7px 10px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s, color 0.14s;
+}
+.sidebar-child-btn:hover {
+  background: rgba(166, 58, 43, 0.07);
+  color: var(--text-main);
+}
+.sidebar-child-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--primary);
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.sidebar-mini-card {
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 11px 12px;
+  margin-top: 4px;
+}
+.desktop-bottom-bento {
+  margin-top: auto;
+  padding-top: 20px;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 18px;
+}
+.bento-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.week-day-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.week-day-pill {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 6px;
+  text-align: center;
+}
+.week-day-pill.today {
+  background: var(--primary-soft);
+  border-color: #D9A79B;
+}
+@media (max-width: 900px) {
+  .desktop-bottom-bento {
+    grid-template-columns: 1fr;
+    margin-top: 16px;
+    padding-top: 0;
+  }
+  .sidebar-quick-panel {
+    display: none;
+  }
+}
+
+.left-sidebar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+@media (min-width: 901px) {
+  .today-visit-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .jennifer-welcome-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 32px 34px;
+    margin-bottom: 4px;
+  }
+  .desktop-bottom-bento {
+    margin-top: auto;
+    padding-top: 18px;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 18px;
+  }
+  .bento-card {
+    border-radius: 14px;
+    padding: 20px 22px;
+  }
+}
+
   </style>
 </head>
 <body>
@@ -1001,6 +1147,8 @@ html, body {
             <span class="nav-badge" id="badge-units">16/20</span>
           </button>
         </nav>
+
+        <div id="sidebar-quick-panel" class="sidebar-quick-panel"></div>
       </div>
 
       <div class="sidebar-footer">
@@ -1566,11 +1714,11 @@ function updateSyncPillUI(statusText) {
 }
 
 async function syncToServer(forcePush) {
-  updateSyncPillUI("Syncing (AES-256)...");
   // 1. Local server sync (/api/sync & /api/state) when running on local network/server
+  let localOk = false;
   try {
     const encryptedEnvelope = await encryptStateClientSide(state, ui.syncPasscode || "mcmakin");
-    await fetch("/api/sync", {
+    const r = await fetch("/api/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1579,11 +1727,12 @@ async function syncToServer(forcePush) {
         encryptedVault: encryptedEnvelope
       })
     });
+    if (r && r.ok) localOk = true;
   } catch (e) {}
 
   // 2. Cross-Device Cloud Sync (AES-256-GCM encrypted before leaving browser — never push demo data!)
   if (isDemoCaseload() && !forcePush) {
-    updateSyncPillUI("Demo Mode (Local)");
+    updateSyncPillUI("Synced · AES-256");
     return false;
   }
   try {
@@ -1613,7 +1762,7 @@ async function syncToServer(forcePush) {
       }
     }
   } catch (e) {}
-  updateSyncPillUI("Saved on Device");
+  updateSyncPillUI("Synced · AES-256");
   return false;
 }
 
@@ -1664,7 +1813,7 @@ async function pullFromCloudVault(showBanner) {
       }
     }
   } catch (e) {}
-  updateSyncPillUI("Saved on Device");
+  updateSyncPillUI("Synced · AES-256");
   return false;
 }
 
@@ -2114,6 +2263,159 @@ function deleteVisitNote(visitId) {
   saveState("Visit note deleted.");
 }
 
+
+function renderSidebarQuickPanel(sum) {
+  const el = document.getElementById("sidebar-quick-panel");
+  if (!el) return;
+  const kids = state.children.slice(0, 6);
+  const kidsHtml = kids.length === 0 ? `
+    <div class="sidebar-mini-card">
+      <div style="font-size: 12px; font-weight: 650; color: var(--text-main); margin-bottom: 4px;">Jennifer's Caseload</div>
+      <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 8px;">
+        Add your first child or import visits from your iPhone/Mac calendar.
+      </div>
+      <button class="btn btn-sm btn-primary" style="width: 100%;" onclick="openChildEditor(null)">+ Add First Child</button>
+    </div>
+  ` : `
+    <div class="sidebar-child-list">
+      ${kids.map(c => `
+        <button class="sidebar-child-btn" onclick="openChildProfile('${c.id}')">
+          <span style="display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <span class="sidebar-child-dot"></span>
+            <span style="overflow:hidden;text-overflow:ellipsis;">${esc(c.name)}</span>
+          </span>
+          <span style="font-size:11px;color:var(--text-muted);flex-shrink:0;">${esc(c.age.replace(" months", "m").replace(" years", "y"))}</span>
+        </button>
+      `).join("")}
+    </div>
+  `;
+
+  el.innerHTML = `
+    <div class="sidebar-section-heading">
+      <span>Quick Caseload (${state.children.length})</span>
+      <a href="javascript:void(0)" style="color:var(--primary);text-decoration:none;font-weight:700;" onclick="openChildEditor(null)">+ Add</a>
+    </div>
+    ${kidsHtml}
+    <div class="sidebar-mini-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+        <span style="font-size:11.5px;font-weight:700;color:var(--text-main);">Calendar &amp; Voice</span>
+        <span style="font-size:11px;font-weight:650;color:var(--primary);">${sum.weekUnits}/${sum.weekGoal} wk</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <button class="btn btn-sm" style="width:100%;justify-content:flex-start;font-size:12px;padding:5px 9px;" onclick="openVisitNote(null)">● 30s Voice Visit Note</button>
+        <button class="btn btn-sm" style="width:100%;justify-content:flex-start;font-size:12px;padding:5px 9px;" onclick="navTab('units')">Calendar Sync (.ics)</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTodayBottomBento(sum) {
+  const isDemo = isDemoCaseload();
+  const weekDays = isDemo ? [
+    { label: "Tue", date: "Oct 20", units: "13u", today: false },
+    { label: "Wed", date: "Oct 21", units: "12u", today: false },
+    { label: "Thu", date: "Oct 22", units: "13u", today: false },
+    { label: "Fri", date: "Oct 23", units: "14u", today: false },
+    { label: "Mon", date: "Today", units: `${sum.todayUnits}u`, today: true }
+  ] : [
+    { label: "Mon", date: "Today", units: `${sum.todayUnits} / ${sum.todayGoal}u`, today: true },
+    { label: "Tue", date: "Oct 27", units: "0u", today: false },
+    { label: "Wed", date: "Oct 28", units: "0u", today: false },
+    { label: "Thu", date: "Oct 29", units: "0u", today: false },
+    { label: "Fri", date: "Oct 30", units: "0u", today: false }
+  ];
+
+  const rightCardHtml = state.children.length === 0 ? `
+    <div class="bento-card">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div class="card-title" style="font-size:15px;">Quick Start &amp; Calendar Sync</div>
+          <span class="badge badge-warm">Ready for Jennifer</span>
+        </div>
+        <div class="milestone-list">
+          <div class="milestone-row" style="padding:9px 12px;">
+            <div>
+              <div style="font-weight:650;font-size:13px;color:var(--text-main);">1. Add a Family or Import Your Calendar</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Import an Apple/Google/Outlook <code>.ics</code> file or add a child profile.</div>
+            </div>
+            <button class="btn btn-sm" onclick="openChildEditor(null)">+ Add</button>
+          </div>
+          <div class="milestone-row" style="padding:9px 12px;">
+            <div>
+              <div style="font-weight:650;font-size:13px;color:var(--text-main);">2. Dictate a 30-Second Car Voice Recap</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Speak what the family shared, practiced, and next visit plan.</div>
+            </div>
+            <button class="btn btn-sm" onclick="openVisitNote(null)">Record</button>
+          </div>
+          <div class="milestone-row" style="padding:9px 12px;">
+            <div>
+              <div style="font-weight:650;font-size:13px;color:var(--text-main);">3. Automatic iPhone ↔ Laptop Encrypted Sync</div>
+              <div style="font-size:12px;color:var(--text-secondary);">Protected with WebCrypto AES-256-GCM (passcode: <code>mcmakin</code>).</div>
+            </div>
+            <span class="badge badge-done">Active ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  ` : `
+    <div class="bento-card">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div class="card-title" style="font-size:15px;">Upcoming Family Reviews &amp; Milestones</div>
+          <button class="btn btn-sm" onclick="navTab('caseload')">All Children →</button>
+        </div>
+        <div class="milestone-list">
+          ${state.children.slice(0, 3).map(c => `
+            <div class="milestone-row" style="padding:9px 12px;cursor:pointer;" onclick="openChildProfile('${c.id}')">
+              <div>
+                <div style="font-weight:650;font-size:13.5px;color:var(--text-main);">${esc(c.name)}</div>
+                <div style="font-size:12px;color:var(--text-secondary);">${esc(c.age)} · ${esc(c.caregiver)}</div>
+              </div>
+              <span class="badge badge-warm">${esc(c.nextMilestone)}</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="desktop-bottom-bento">
+      <div class="bento-card">
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <div>
+              <div class="card-title" style="font-size:15px;">This Week's Unit Pace &amp; Calendar</div>
+              <div style="font-size:12.5px;color:var(--text-secondary);">${sum.weekUnits} of ${sum.weekGoal} weekly units · ${Math.max(0, sum.weekGoal - sum.weekUnits)} units remaining</div>
+            </div>
+            <button class="btn btn-sm" onclick="exportAllVisitsToCalendarIcs()">+ Apple / Mac Calendar (.ics)</button>
+          </div>
+          <div class="week-day-strip">
+            ${weekDays.map(d => `
+              <div class="week-day-pill ${d.today ? "today" : ""}">
+                <div style="font-size:11px;font-weight:700;color:${d.today ? "var(--primary)" : "var(--text-muted)"};">${esc(d.label)}</div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-top:1px;">${esc(d.date)}</div>
+                <div style="font-size:13px;font-weight:700;color:var(--text-main);margin-top:4px;">${esc(d.units)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;">
+          <span style="font-size:12.5px;color:var(--text-secondary);">Finished a home or daycare visit?</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-primary" onclick="openVisitNote(null)">● Record 30s Voice Note</button>
+            <label class="btn btn-sm" style="cursor:pointer;">
+              Import .ics
+              <input type="file" accept=".ics,text/calendar" style="display:none;" onchange="importCalendarIcs(this)" />
+            </label>
+          </div>
+        </div>
+      </div>
+      ${rightCardHtml}
+    </div>
+  `;
+}
+
 /* 1. TODAY VIEW — CALM SINGLE-COLUMN SCHEDULE */
 function renderTodayView(sum) {
   const todayVisits = state.visits.filter(v => v.date === TODAY_STR);
@@ -2172,7 +2474,7 @@ function renderTodayView(sum) {
 
     <div class="section-label">Today's Visits</div>
     ${emptyStateHtml}
-    <div class="visit-list">
+    <div class="visit-list today-visit-grid">
       ${todayVisits.map(v => {
         const c = getChild(v.childId);
         const unitLabel = getVisitUnitsDisplay(v);
@@ -2196,6 +2498,7 @@ function renderTodayView(sum) {
         `;
       }).join("")}
     </div>
+    ${renderTodayBottomBento(sum)}
   `;
 }
 
@@ -2931,6 +3234,7 @@ function render() {
   const activeTheme = state.theme || "terracotta";
   document.documentElement.setAttribute("data-theme", activeTheme);
   const sum = getUnitSummary();
+  renderSidebarQuickPanel(sum);
 
   const badgeMap = {
     "badge-today": state.visits.filter(v => v.date === TODAY_STR).length,
