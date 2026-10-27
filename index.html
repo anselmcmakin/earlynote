@@ -92,6 +92,9 @@
 
 html, body {
   height: 100%;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif;
   background: var(--bg-app);
   color: var(--text-main);
@@ -104,6 +107,8 @@ html, body {
   display: flex;
   min-height: 100vh;
   width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* LEFT SIDEBAR */
@@ -261,6 +266,7 @@ html, body {
 .main-stage {
   flex: 1;
   min-width: 0;
+  width: 100%;
   padding: 26px 40px 48px;
   max-width: 860px;
   margin: 0 auto;
@@ -664,6 +670,9 @@ html, body {
   flex-wrap: wrap;
 }
 .input, .select, .textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 9px 12px;
   border-radius: 9px;
   border: 1px solid var(--border-strong);
@@ -685,14 +694,27 @@ html, body {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
+  width: 100%;
+}
+.form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+.theme-choice-btn {
+  width: 100%;
+  justify-content: space-between;
+  padding: 12px 14px;
+  text-align: left;
+  gap: 10px;
 }
 .form-label {
   font-size: 12px;
@@ -715,65 +737,75 @@ html, body {
   border: 1px solid var(--border-strong);
 }
 
-/* MOBILE NAVIGATION */
+/* MOBILE NAVIGATION — REDESIGNED FLOATING INSET DOCK FOR FULL-SCREEN IPHONE */
 .mobile-topbar {
   display: none;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
   background: var(--bg-sidebar);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 25;
+  width: 100%;
 }
+
 .mobile-tabbar {
   display: none;
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--bg-sidebar);
-  border-top: 1px solid var(--border);
-  padding: 8px 10px 12px;
-  z-index: 30;
-  justify-content: space-around;
+  left: 16px;
+  right: 16px;
+  bottom: max(26px, calc(16px + env(safe-area-inset-bottom, 0px)));
+  max-width: 440px;
+  margin: 0 auto;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 22px;
+  padding: 7px 8px;
+  z-index: 40;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+  box-shadow: 0 10px 30px rgba(38, 29, 26, 0.18), 0 2px 8px rgba(38, 29, 26, 0.08);
 }
+
 .mob-tab {
   border: none;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 2px 6px;
+  border-radius: 14px;
   cursor: pointer;
+  min-width: 0;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+.mob-tab svg {
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
 }
 .mob-tab.active {
-  color: var(--primary);
-  background: var(--primary-soft);
-}
-
-@media (max-width: 900px) {
-  .left-sidebar { display: none; }
-  .mobile-topbar { display: flex; }
-  .mobile-tabbar { display: flex; }
-  .app-shell { flex-direction: column; }
-  .main-stage { padding: 18px 16px 92px; }
-  .unit-progress-card { grid-template-columns: 1fr; gap: 16px; padding: 16px 18px; }
-  .caseload-grid { grid-template-columns: 1fr; }
-  .form-grid { grid-template-columns: 1fr; }
-  .visit-row { padding: 14px 15px; gap: 10px; }
-  .visit-row-left { gap: 12px; }
-  .visit-time { min-width: 64px; font-size: 12.5px; }
-  .visit-child { font-size: 15px; }
-  .visit-sub { font-size: 12.5px; }
-  .visit-units { font-size: 11.5px; padding: 3px 8px; }
-  .today-header-actions { display: none; }
+  color: #FFFFFF;
+  background: var(--primary);
+  font-weight: 650;
+  box-shadow: 0 2px 8px rgba(166, 58, 43, 0.28);
 }
 
 /* JENNIFER MODE BANNER & EMPTY STATE */
@@ -789,6 +821,7 @@ html, body {
   gap: 16px;
   box-shadow: 0 3px 12px rgba(122, 46, 34, 0.07);
   flex-wrap: wrap;
+  width: 100%;
 }
 [data-theme="espresso"] .jennifer-banner,
 [data-theme="slate"] .jennifer-banner {
@@ -799,8 +832,8 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  min-width: 220px;
-  flex: 1;
+  min-width: 0;
+  flex: 1 1 200px;
 }
 .jennifer-banner-title {
   font-size: 14.5px;
@@ -809,6 +842,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .jennifer-banner-sub {
   font-size: 13px;
@@ -818,10 +852,11 @@ html, body {
   background: var(--bg-card);
   border: 1.5px dashed var(--border-strong);
   border-radius: 16px;
-  padding: 36px 28px;
+  padding: 36px 24px;
   text-align: center;
   margin-bottom: 22px;
   box-shadow: var(--shadow);
+  width: 100%;
 }
 .jennifer-welcome-title {
   font-size: 20px;
@@ -845,9 +880,10 @@ html, body {
 }
 .sync-card-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 14px;
+  width: 100%;
 }
 .sync-status-box {
   background: var(--bg-subtle);
@@ -860,14 +896,56 @@ html, body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  width: 100%;
 }
+
 @media (max-width: 900px) {
-  .jennifer-banner {
-    padding: 14px 16px;
+  .left-sidebar { display: none; }
+  .mobile-topbar { display: flex; }
+  .mobile-tabbar { display: grid; }
+  body::after {
+    content: "";
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 96px;
+    background: linear-gradient(to top, var(--bg-app) 35%, rgba(250, 245, 239, 0));
+    pointer-events: none;
+    z-index: 30;
   }
-  .sync-card-grid {
+  .app-shell { flex-direction: column; width: 100%; max-width: 100vw; overflow-x: hidden; }
+  .main-stage {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 16px 14px calc(112px + env(safe-area-inset-bottom, 16px));
+  }
+  .card {
+    padding: 16px 15px;
+    border-radius: 13px;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .unit-progress-card {
     grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 16px 16px;
+    width: 100%;
   }
+  .caseload-grid { grid-template-columns: 1fr; }
+  .form-grid, .form-grid-2, .sync-card-grid { grid-template-columns: 1fr; }
+  .visit-row { padding: 14px 14px; gap: 10px; flex-wrap: wrap; }
+  .visit-row-left { gap: 10px; min-width: 0; }
+  .visit-time { min-width: 60px; font-size: 12.5px; }
+  .visit-child { font-size: 15px; }
+  .visit-sub { font-size: 12.5px; }
+  .visit-units { font-size: 11.5px; padding: 3px 8px; }
+  .today-header-actions { display: none; }
+  .jennifer-banner { padding: 14px 15px; }
+  .btn { max-width: 100%; white-space: normal; }
+  .theme-choice-btn { font-size: 13px; padding: 11px 12px; }
 }
 
   </style>
@@ -939,13 +1017,28 @@ html, body {
     <main class="main-stage" id="main-stage"></main>
   </div>
 
-  <!-- MOBILE BOTTOM TAB BAR -->
+  <!-- MOBILE BOTTOM TAB BAR (INSET FLOATING DOCK FOR FULL-SCREEN IPHONE) -->
   <nav class="mobile-tabbar">
-    <button class="mob-tab active" data-nav="today" onclick="navTab('today')">Today</button>
-    <button class="mob-tab" data-nav="caseload" onclick="navTab('caseload')">Caseload</button>
-    <button class="mob-tab" data-nav="notes" onclick="navTab('notes')">All Notes</button>
-    <button class="mob-tab" data-nav="units" onclick="navTab('units')">Units</button>
-    <button class="mob-tab" data-nav="settings" onclick="navTab('settings')">Settings</button>
+    <button class="mob-tab active" data-nav="today" onclick="navTab('today')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><circle cx="12" cy="15" r="1.5" fill="currentColor" stroke="none"/></svg>
+      <span>Today</span>
+    </button>
+    <button class="mob-tab" data-nav="caseload" onclick="navTab('caseload')">
+      <svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span>Caseload</span>
+    </button>
+    <button class="mob-tab" data-nav="notes" onclick="navTab('notes')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+      <span>Notes</span>
+    </button>
+    <button class="mob-tab" data-nav="units" onclick="navTab('units')">
+      <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Units</span>
+    </button>
+    <button class="mob-tab" data-nav="settings" onclick="navTab('settings')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
   </nav>
 
   <script>
@@ -2013,7 +2106,7 @@ function renderCaseloadView() {
     </div>
 
     <div class="filter-bar">
-      <input class="input" style="flex: 1; min-width: 240px;" placeholder="Search children or caregivers..." value="${esc(ui.caseloadSearch)}" oninput="ui.caseloadSearch=this.value;render();" />
+      <input class="input" style="flex: 1; min-width: 0;" placeholder="Search children or caregivers..." value="${esc(ui.caseloadSearch)}" oninput="ui.caseloadSearch=this.value;render();" />
     </div>
 
     ${emptyCaseloadHtml}
@@ -2097,7 +2190,7 @@ function renderChildProfilePage() {
     <div class="card">
       <div class="card-header">
         <div class="card-title">Visit &amp; Note History (${childVisits.length})</div>
-        <input class="input" style="min-width: 240px;" placeholder="Search ${esc(c.firstName)}'s notes by word or date..." value="${esc(ui.childNoteSearch)}" oninput="ui.childNoteSearch=this.value;render();" />
+        <input class="input" style="width: 100%; max-width: 280px; min-width: 0;" placeholder="Search ${esc(c.firstName)}'s notes by word or date..." value="${esc(ui.childNoteSearch)}" oninput="ui.childNoteSearch=this.value;render();" />
       </div>
       <div class="visit-list">
         ${childVisits.length === 0 ? `<div style="padding: 12px; color: var(--text-muted);">No matching notes found.</div>` : childVisits.map(v => `
@@ -2256,7 +2349,7 @@ function renderAllNotesView() {
     </div>
 
     <div class="filter-bar">
-      <input class="input" style="flex: 1; min-width: 240px;" placeholder="Search notes by keyword, routine, child, or date..." value="${esc(ui.allNotesSearch)}" oninput="ui.allNotesSearch=this.value;render();" />
+      <input class="input" style="flex: 1; min-width: 0;" placeholder="Search notes by keyword, routine, child, or date..." value="${esc(ui.allNotesSearch)}" oninput="ui.allNotesSearch=this.value;render();" />
       <select class="select" onchange="ui.allNotesChild=this.value;render();">
         <option value="ALL">All Children (${state.children.length})</option>
         ${state.children.map(c => `<option value="${c.id}" ${ui.allNotesChild === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}
@@ -2389,15 +2482,15 @@ function renderSettingsView() {
       <div class="card-title" style="margin-bottom: 12px;">Color Theme</div>
       <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px;">
         ${themes.map(t => `
-          <button class="btn ${state.theme === t.id ? "btn-primary" : ""}" style="justify-content: space-between; padding: 12px 16px;" onclick="state.theme='${t.id}'; document.documentElement.setAttribute('data-theme','${t.id}'); saveState('Theme changed to ${t.label}.');">
+          <button class="btn theme-choice-btn ${state.theme === t.id ? "btn-primary" : ""}" onclick="state.theme='${t.id}'; document.documentElement.setAttribute('data-theme','${t.id}'); saveState('Theme changed to ${t.label}.');">
             <span>${esc(t.label)}</span>
-            <span>${state.theme === t.id ? "Active ✓" : "Select"}</span>
+            <span style="flex-shrink: 0; font-weight: 700;">${state.theme === t.id ? "Active ✓" : "Select"}</span>
           </button>
         `).join("")}
       </div>
 
       <div class="card-title" style="margin-bottom: 12px;">Daily &amp; Weekly Unit Goals</div>
-      <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-grid form-grid-2">
         <div class="form-group">
           <label class="form-label">Daily Goal (Units)</label>
           <input class="input" type="number" value="${state.dailyGoalUnits}" onchange="state.dailyGoalUnits=Number(this.value)||20; saveState('Updated daily unit goal.');" />
