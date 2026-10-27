@@ -1,0 +1,23 @@
+{
+  "name": "EarlyNote: Early Intervention",
+  "short_name": "EarlyNote",
+  "description": "IFSP Caseload, Voice Service Notes & 15-Minute Unit Tracker for Early Interventionists",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF5EF",
+  "theme_color": "#7A2E22",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
