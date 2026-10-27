@@ -1679,6 +1679,38 @@ function renderDemoBanner() {
   `;
 }
 
+
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  render();
+});
+
+function isRunningStandalone() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+async function triggerInstallApp() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice && choice.outcome === "accepted") {
+      deferredInstallPrompt = null;
+      ui.bannerMsg = "EarlyNote installed as a standalone desktop app!";
+    }
+    render();
+    return;
+  }
+  ui.tab = "settings";
+  ui.page = null;
+  ui.bannerMsg = "See 'Install Standalone App (No Browser Bar)' below for 1-click Mac Dock & iPhone Home Screen install.";
+  render();
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -3143,8 +3175,36 @@ function renderSettingsView() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title">Settings</div>
-        <div class="page-subtitle">Color theme, unit goals, and backup</div>
+        <div class="page-title">Settings &amp; App Install</div>
+        <div class="page-subtitle">Install EarlyNote as a standalone Mac &amp; iPhone app, sync, and customize</div>
+      </div>
+    </div>
+
+    <div class="card" style="border: 1.5px solid #D9A79B; background: linear-gradient(135deg, #FFFDFB 0%, #F9EAE6 100%);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+        <div class="card-title">Install Standalone App (Zero Browser Address Bar)</div>
+        <span class="badge badge-warm">${isRunningStandalone() ? "Installed Standalone App ✓" : "Standalone App Ready"}</span>
+      </div>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 12px;">
+        Run EarlyNote in its own dedicated window with its crimson icon on your <strong>iPhone Home Screen</strong> and <strong>Mac Dock</strong>—no browser URL bar or tabs:
+      </p>
+      <div class="milestone-list" style="margin-bottom: 12px;">
+        <div class="milestone-row" style="background:#FFFFFF;">
+          <div>
+            <div style="font-weight:700;color:var(--text-main);">iPhone (Full-Screen Native App Mode)</div>
+            <div style="font-size:13px;color:var(--text-secondary);">In Safari, tap the <strong>Share</strong> icon (bottom center) → tap <strong>Add to Home Screen</strong> → tap <strong>Add</strong>. Opens from your Home Screen with zero Safari bars.</div>
+          </div>
+        </div>
+        <div class="milestone-row" style="background:#FFFFFF;">
+          <div>
+            <div style="font-weight:700;color:var(--text-main);">Mac Desktop App (Mac Dock &amp; Applications Folder)</div>
+            <div style="font-size:13px;color:var(--text-secondary);">
+              <strong>Safari on Mac:</strong> Click <strong>File → Add to Dock…</strong> in the top menu bar.<br/>
+              <strong>Chrome / Edge on Mac or PC:</strong> Click the button below (or the install icon in the address bar) to install the standalone desktop app.
+            </div>
+          </div>
+          ${deferredInstallPrompt ? `<button class="btn btn-primary" onclick="triggerInstallApp()">Install Desktop App Now</button>` : ""}
+        </div>
       </div>
     </div>
 
