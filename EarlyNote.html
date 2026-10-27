@@ -2524,9 +2524,13 @@ window.addEventListener("DOMContentLoaded", () => {
   if (params.get("childId")) ui.selectedChildId = params.get("childId");
   if (params.get("visitId")) ui.editingVisitId = params.get("visitId");
   render();
-  pullFromCloudVault(false).then(pulled => {
-    if (!pulled) syncToServer();
-  });
+  if (params.get("mode") === "demo" || params.get("mode") === "jennifer" || params.get("fresh") === "1") {
+    syncToServer(true);
+  } else {
+    pullFromCloudVault(false).then(pulled => {
+      if (!pulled) syncToServer();
+    });
+  }
 });
 
   </script>
