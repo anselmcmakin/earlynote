@@ -139,3 +139,39 @@
    - **Terms of Service Boundary:** Explicitly state in the ToS that EarlyNote is a zero-knowledge personal drafting and unit-tracking companion—not an official medical record or replacement for `BRIDGES`/`Therap`—and require the EI's clinical attestation checkbox before any note can be copied out.
 5. **ADD (Organic Zero-Outreach Growth Engine): Built-In "Give 30 Days, Get 30 Days" Colleague Referral Link:**
    - Since growth must be 100% organic with zero cold outreach, build a 1-tap **"Share EarlyNote with an EI Colleague (1 Month Free)"** referral card inside Settings so Jennifer and her first few EI coworkers naturally spread it across SC agencies.
+
+---
+
+## 7. Deep-Dive Technical, Regulatory & App Store Audit (@Research)
+
+*(Full line-by-line code audit and replacement functions saved at `/workspace/ei-app/05-Research-Audit-EarlyNote-Master-Plan.md`)*
+
+### A. SC BabyNet & BHDD-OIDD Statutory Rule Corrections
+1. **`T1027-TL` (Family Training) Daily & Monthly Caps:**
+   - Standard planned `T1027-TL` is **`4 units/day` (60 min)** and **`16 units/month` (4 hours/mo)**. Authorizing `>16 units/month` requires submitting an **OIDD Service Justification Form (`ACIS EI-416`)** within 14 calendar days. When combining a regular visit with a separate Make-Up row (`Make-Up` checkbox added Sept 3, 2025), `BRIDGES` enforces a hard daily system cap of **`16 units/day` (240 min) per service**.
+2. **Exact 6-Calendar-Month IFSP Review Formula (`ACIS EI-406` / `OIDD Ch. 11, p. 38`):**
+   - Must use **Exact 6-Calendar-Month Anniversary** (`addMonths(IFSP_Start_Date, 6)`, zero grace period—e.g., `7/1/2026 -> 1/1/2027`, NOT `+ 180 days`, which is 4 days late across May–Oct). For DDSN (Ages 3–6), requires an updated Curriculum-Based Assessment (`HELP`/`Carolina`) within 14 days prior (`ACIS EI-424`).
+3. **Additional Mandatory SC Compliance Guards:**
+   - **Zero Time-Overlap & No Virtual `T1027` (`OIDD Ch. 7 & Ch. 9, p. 24–26`):** `BRIDGES` rejects overlapping start/end times on the same day across the caseload or between `T1027` and `T1016`, and prohibits virtual/telehealth `T1027` Family Training.
+   - **7-Calendar-Day `BRIDGES` Entry Window (`BabyNet Appendix A, p. 11`):** Every visit must be logged within 7 calendar days of service (`3 business days` for demographic updates in `Therap`/`CDSS`).
+   - **Complete Statutory Countdown Chain:** `2-Business-Day Initial Contact (EI-401)` -> `45-Day Initial IFSP (34 CFR § 303.310)` -> `7-Day Non-Waivable Prior Written Notice (BN-F01 / EI-403)` -> `30-Day Timely Service Initiation (EI-417)` -> `Exact 6-Month Review (EI-406)` -> `365-Day Annual IFSP + 30-Day Pre-Annual Bundle (BN-F04, BN-F05, BN-F06, BN-F07, EI-424, EI-434)` -> `27–33 Month LEA Part B Transition (BN-F09 / BN-F10)` -> `DDSN Continuation FSP Window [3rd Birthday - 14d, 3rd Birthday - 1d]` -> `3rd Birthday Part C Exit (EI-410)` -> `Age 5+ Service Justification (EI-436)`.
+
+### B. Apple App Store Review Guards (`Guidelines 5.1.2(i), 5.1.3, 3.1.1(a), 4.2`)
+1. **Apple Guideline `5.1.2(i)` (Nov 13, 2025 Third-Party AI Consent Rule):**
+   - Add an explicit pre-flight consent modal before any cloud LLM (`AWS Bedrock`) call naming the provider, stating only de-identified tokens are sent, and offering a revocable toggle in `Settings` that falls back to 100% on-device templates.
+2. **Apple Guideline `5.1.3` (Health Privacy) — iOS App-Switcher Screen Blur Mask:**
+   - Apply a `backdrop-filter: blur(24px)` privacy mask immediately on `visibilitychange` (`document.hidden`) / iOS backgrounding so child names never appear in iOS App Switcher snapshots, paired with `FaceID / TouchID` unlock.
+3. **Apple Guideline `3.1.1(a)` & `3.1.3(b)` (US Storefront & StoreKit 2 Parity):**
+   - Restrict App Store Connect availability to the **United States (`US`) storefront**, include native **StoreKit 2 In-App Purchase** (`15%` Small Business Program) inside iOS, and allow multiplatform sign-in for web/agency Stripe subscribers.
+4. **3-Layer On-Device Safe Harbor Scrubber:**
+   - Layer 1: Per-Child Known Roster Dictionary (`child`, `nicknames`, `caregivers`, `daycare`).
+   - Layer 2: Kinship & Clinical Honorific Regex (`Grandma Betty`, `Ms. Green`, `Dr. Miller` -> `[CAREGIVER_OR_PROVIDER]`).
+   - Layer 3: Street Address, Date, Phone, and 10-Digit Medicaid/BabyNet ID Regex.
+
+### C. Immediate P0 Codebase Hardening Checklist (`prototype/v9.js` & `server.py`)
+1. **Remove Hardcoded Passcode & Token (`v9.js`):** Remove any default `"mcmakin"` passphrase/token from public git and require a private device-stored passphrase (`PBKDF2-HMAC-SHA256 600,000 iterations`).
+2. **Zero-Plaintext Sync (`server.py`):** Send and store **only** `encryptedVault` (`AES-256-GCM` ciphertext) on `/api/sync`, never plaintext `state`.
+3. **Universal CMS 8-Minute Rule (`calcSilentUnits`):** Apply `m < 8 ? 0 : Math.min(16, Math.floor((m + 7) / 15))` across all 15-minute unit visit types (preventing `<8 min` visits from rounding to 1 unit).
+4. **Dynamic Local Date (`TODAY_STR`):** Compute `TODAY_STR` dynamically from local device date in Jennifer mode so Today's Schedule advances automatically every day.
+5. **Restore `<input type="date">` Statutory Engine:** Keep structured `DOB`, `Intake Date`, and `IFSP Start Date` date pickers on Child profiles so all statutory countdowns calculate automatically.
+6. **Native On-Device Speech + Active Goals Strip + 12-Point `BRIDGES` Copy:** Wire native `SpeechRecognition` / `webkitSpeechRecognition` (0 MB download), display the child's active IFSP goals right above the microphone button, and format `copyVisitNote()` into the full 12-point `BRIDGES`/`Therap` note with automatic `12:00 PM – 12:59 PM` -> `24-Hour Military Time` conversion and `"Ready to Paste in BRIDGES"` triage filter.
